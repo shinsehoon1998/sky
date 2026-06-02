@@ -29,5 +29,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# KB automation
+kb-automation/.env
+kb-automation/data/*.xlsx
+kb-automation/*.png
+kb-automation/*.pdf
+kb-automation/downloads/
+
 # misc
 .DS_Store
