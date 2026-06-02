@@ -288,11 +288,11 @@ function MainPage() {
           </div>
         </section>
 
-        {/* Step 3: 전산등록 매크로 (팝업 윈도우 자동화) */}
+        {/* Step 3: 전산등록 매크로 (다중입력 10명 배치 복사) */}
         <section id="section-macro" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 hidden">
           <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <i class="fas fa-robot text-blue-500"></i>
-            3. 전산 등록 매크로
+            3. 전산 등록 (다중입력 배치 복사)
           </h2>
 
           {/* 안내 배너 */}
@@ -300,124 +300,115 @@ function MainPage() {
             <div class="flex items-start gap-3">
               <i class="fas fa-info-circle text-blue-600 mt-1"></i>
               <div>
-                <p class="font-medium text-blue-800 text-sm">팝업 윈도우 자동화 방식</p>
+                <p class="font-medium text-blue-800 text-sm">다중입력 10명 배치 복사 방식</p>
                 <p class="text-blue-700 text-sm mt-1">
-                  KB손해보험 전산 시스템을 <strong>새 창(팝업)</strong>으로 열고, 고객 데이터를 자동 입력합니다.
-                  주입이 불가능할 경우 클립보드 복사 방식으로 자동 전환됩니다.
+                  KB손보 사이트의 <strong>「다중입력」</strong> 기능을 활용하여 최대 <strong>10명씩</strong> 배치로 복사합니다.
+                  KB 사이트에서 다중입력 체크 후, 복사된 데이터를 첫 번째 칸에 <strong>붙여넣기(Ctrl+V)</strong> 하면 한 번에 입력됩니다.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* KB 팝업 연결 상태 */}
+          {/* 배치 그룹 선택 */}
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="flex items-center gap-2 mb-3">
+                <i class="fas fa-layer-group text-blue-500"></i>
+                <h3 class="font-bold text-gray-700 text-sm">배치 그룹</h3>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mb-3">
+                <div class="bg-gray-50 rounded p-2 text-center">
+                  <p class="text-lg font-bold text-gray-700" id="batch-total">0</p>
+                  <p class="text-xs text-gray-400">전체 고객</p>
+                </div>
+                <div class="bg-gray-50 rounded p-2 text-center">
+                  <p class="text-lg font-bold text-gray-700" id="batch-count">0</p>
+                  <p class="text-xs text-gray-400">총 배치 수</p>
+                </div>
+                <div class="bg-blue-50 rounded p-2 text-center">
+                  <p class="text-lg font-bold text-blue-700" id="batch-current">-</p>
+                  <p class="text-xs text-blue-500">현재 배치</p>
+                </div>
+                <div class="bg-blue-50 rounded p-2 text-center">
+                  <p class="text-lg font-bold text-blue-700" id="batch-size">10</p>
+                  <p class="text-xs text-blue-500">배치당 인원</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="border border-gray-200 rounded-lg p-4">
+              <h3 class="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2">
+                <i class="fas fa-clipboard-list text-green-500"></i>
+                현재 배치 미리보기
+              </h3>
+              <div class="bg-gray-50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="text-gray-400 border-b border-gray-200">
+                      <th class="text-left py-1">#</th>
+                      <th class="text-left py-1">주민등록번호</th>
+                      <th class="text-left py-1">고객명</th>
+                    </tr>
+                  </thead>
+                  <tbody id="batch-preview-body">
+                    <tr><td colspan="3" class="py-2 text-gray-400 text-center">데이터 없음</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* 배치 복사 액션 */}
           <div class="border border-gray-200 rounded-lg p-4 mb-4">
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2">
-                <i class="fas fa-external-link-alt text-gray-500"></i>
-                KB손해보험 전산 시스템 연결
+                <i class="fas fa-copy text-blue-500"></i>
+                KB 사이트에 붙여넣기 할 데이터
               </h3>
-              <span id="macro-connection-badge" class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">
-                연결 안 됨
+              <span id="macro-copy-badge" class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">
+                대기 중
               </span>
             </div>
-
-            {/* 연결 상태 상세 */}
-            <div class="grid grid-cols-2 gap-3 mb-3">
-              <div class="bg-gray-50 rounded-lg p-3">
-                <p class="text-xs text-gray-400 mb-1">팝업 상태</p>
-                <p class="text-sm font-medium text-gray-700" id="macro-popup-status">
-                  <i class="fas fa-circle text-gray-400 text-xs mr-1"></i> 열리지 않음
-                </p>
-              </div>
-              <div class="bg-gray-50 rounded-lg p-3">
-                <p class="text-xs text-gray-400 mb-1">자동 입력</p>
-                <p class="text-sm font-medium text-gray-700" id="macro-inject-status">
-                  <i class="fas fa-circle text-gray-400 text-xs mr-1"></i> 대기 중
-                </p>
-              </div>
+            <div class="bg-gray-900 rounded-lg p-3 mb-3 font-mono text-green-400 text-xs overflow-x-auto whitespace-pre max-h-28 overflow-y-auto" id="batch-copy-preview">
+              아직 복사된 데이터가 없습니다
             </div>
-
             <div class="flex gap-2">
-              <button id="btn-open-popup" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 rounded-lg transition-colors font-medium">
-                <i class="fas fa-window-restore mr-1"></i> KB손보 팝업 열기
+              <button id="btn-batch-copy" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2.5 rounded-lg transition-colors font-medium">
+                <i class="fas fa-copy mr-1"></i> 현재 배치 복사 (Ctrl+C)
               </button>
-              <button id="btn-reopen-popup" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2 rounded-lg transition-colors hidden">
-                <i class="fas fa-redo mr-1"></i> 다시 열기
-              </button>
-              <button id="btn-check-fields" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2 rounded-lg transition-colors hidden">
-                <i class="fas fa-search mr-1"></i> 필드 확인
+              <button id="btn-batch-next" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2.5 rounded-lg transition-colors" disabled>
+                다음 배치 <i class="fas fa-chevron-right ml-1"></i>
               </button>
             </div>
+            <p class="text-xs text-gray-400 mt-2" id="clipboard-status">
+              <i class="fas fa-lightbulb mr-1"></i> KB 사이트에서 「다중입력」 체크 → 첫 칸 클릭 → Ctrl+V 붙여넣기 → 「출력」 클릭
+            </p>
           </div>
 
-          {/* 데이터 전송 상태 */}
-          <div class="border border-gray-200 rounded-lg p-4 mb-4" id="clipboard-status-panel">
-            <div class="flex items-center gap-2 mb-3">
-              <i class="fas fa-paper-plane text-gray-400"></i>
-              <h3 class="font-bold text-gray-700 text-sm">데이터 전송 상태</h3>
+          {/* 진행률 */}
+          <div class="mt-3 mb-3">
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span id="macro-progress">0 / 0 배치 완료</span>
+              <span id="macro-progress-pct">0%</span>
             </div>
-            <div class="bg-gray-50 rounded-lg p-3" id="clipboard-status">
-              <p class="text-xs text-gray-500"><i class="fas fa-clock mr-1"></i> KB손보 팝업을 열고 로그인 후 진행하세요.</p>
-            </div>
-          </div>
-
-          {/* 현재 처리 중인 고객 정보 */}
-          <div id="current-customer" class="border border-gray-200 rounded-lg p-4 hidden">
-            <h3 class="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2">
-              <i class="fas fa-user-check text-green-500"></i>
-              현재 처리 중
-            </h3>
-            <div class="grid grid-cols-3 gap-4">
-              <div>
-                <p class="text-xs text-gray-400 mb-1">이름</p>
-                <p class="font-bold text-gray-800 text-lg" id="macro-name">-</p>
-              </div>
-              <div>
-                <p class="text-xs text-gray-400 mb-1">주민등록번호</p>
-                <p class="font-bold text-gray-800 text-lg" id="macro-jumin">-</p>
-              </div>
-              <div>
-                <p class="text-xs text-gray-400 mb-1">연락처</p>
-                <p class="font-bold text-gray-800 text-lg" id="macro-phone">-</p>
-              </div>
-            </div>
-
-            {/* 진행률 표시줄 */}
-            <div class="mt-3 mb-3">
-              <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-                <span id="macro-progress"></span>
-                <span id="macro-progress-pct">0%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2">
-                <div id="macro-progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-              </div>
-            </div>
-
-            <div class="flex gap-2">
-              <button id="btn-macro-prev" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">
-                <i class="fas fa-chevron-left mr-1"></i> 이전
-              </button>
-              <button id="btn-macro-next" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors font-medium">
-                다음 <i class="fas fa-chevron-right ml-1"></i>
-              </button>
-              <button id="btn-copy-all" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">
-                <i class="fas fa-copy mr-1"></i> 전체 복사
-              </button>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div id="macro-progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
             </div>
           </div>
 
           {/* 주의사항 */}
-          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
             <div class="flex items-start gap-2">
               <i class="fas fa-exclamation-triangle text-yellow-600 text-xs mt-0.5"></i>
               <div class="text-xs text-yellow-700">
-                <p class="font-medium">사용 전 확인사항</p>
-                <ul class="list-disc list-inside mt-1 space-y-0.5 text-yellow-600">
-                  <li>MiAgent (KB손보 보안 프로그램)가 PC에 설치되어 있어야 합니다.</li>
-                  <li>팝업 차단이 해제되어 있어야 합니다. (브라우저 설정에서 확인)</li>
-                  <li>팝업 창에서 KB손보 시스템에 먼저 로그인해 주세요.</li>
-                  <li>크로스 오리진 제한으로 스크립트 주입이 안 될 경우, 클립보드 방식으로 자동 전환됩니다.</li>
-                </ul>
+                <p class="font-medium">KB 사이트 사용 방법</p>
+                <ol class="list-decimal list-inside mt-1 space-y-0.5 text-yellow-600">
+                  <li>KB손보 사이트 로그인 → 「동의서출력」 메뉴 진입</li>
+                  <li>「고객인적사항」 옆 <strong>「다중입력」 체크</strong></li>
+                  <li>「주민등록번호」 첫 칸 클릭 → <strong>Ctrl+V</strong> 붙여넣기</li>
+                  <li>「출력」 버튼 클릭 → PDF 다운로드</li>
+                  <li>다음 배치 복사 → 붙여넣기 반복</li>
+                </ol>
               </div>
             </div>
           </div>
