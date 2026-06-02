@@ -1,0 +1,13 @@
+{
+  "name": "kb-automation",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "KB손해보험 전산등록 자동화 스크립트 (Playwright)",
+  "scripts": {
+    "start": "node kb-automation.js",
+    "setup": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.60.0"
+  }
+}

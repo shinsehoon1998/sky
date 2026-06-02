@@ -92,6 +92,29 @@ app.post('/api/normalize', async (c) => {
 })
 
 // ============================================================
+// API: Playwright 자동화용 데이터 export
+// ============================================================
+app.post('/api/export-data', async (c) => {
+  const body = await c.req.json()
+  const { data } = body as { data: CustomerRecord[] }
+  const customers = data.map(r => {
+    const juminRaw = r.jumin.replace(/[^0-9]/g, '')
+    return {
+      jumin: juminRaw.length === 13 ? `${juminRaw.substring(0, 6)}-${juminRaw.substring(6)}` : r.jumin,
+      name: r.name.trim(),
+      phone: r.phone.replace(/[^0-9]/g, '').replace(/^010(\d{4})(\d{4})$/, '010-$1-$2')
+    }
+  })
+  return c.json({
+    exportedAt: new Date().toISOString(),
+    total: customers.length,
+    batchSize: 10,
+    batches: Math.ceil(customers.length / 10),
+    customers
+  })
+})
+
+// ============================================================
 // 메인 페이지
 // ============================================================
 app.get('/', (c) => {
@@ -396,12 +419,12 @@ function MainPage() {
             </div>
           </div>
 
-          {/* 주의사항 */}
-          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          {/* 수동 방식 (다중입력 + 클립보드) 주의사항 */}
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
             <div class="flex items-start gap-2">
-              <i class="fas fa-exclamation-triangle text-yellow-600 text-xs mt-0.5"></i>
+              <i class="fas fa-hand-pointer text-yellow-600 text-xs mt-0.5"></i>
               <div class="text-xs text-yellow-700">
-                <p class="font-medium">KB 사이트 사용 방법</p>
+                <p class="font-medium">📋 수동 방식: KB 사이트에서 직접 작업</p>
                 <ol class="list-decimal list-inside mt-1 space-y-0.5 text-yellow-600">
                   <li>KB손보 사이트 로그인 → 「동의서출력」 메뉴 진입</li>
                   <li>「고객인적사항」 옆 <strong>「다중입력」 체크</strong></li>
@@ -409,6 +432,49 @@ function MainPage() {
                   <li>「출력」 버튼 클릭 → PDF 다운로드</li>
                   <li>다음 배치 복사 → 붙여넣기 반복</li>
                 </ol>
+              </div>
+            </div>
+          </div>
+
+          {/* Playwright 완전 자동화 */}
+          <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-bolt text-white"></i>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="font-bold text-purple-800 text-sm">🤖 완전 자동화 (Playwright)</h3>
+                  <span class="px-2 py-0.5 bg-purple-200 text-purple-700 text-xs rounded-full">추천</span>
+                </div>
+                <p class="text-xs text-purple-700 mb-3">
+                  브라우저를 직접 제어하여 <strong>로그인 → 다중입력 → 데이터 입력 → 출력</strong>까지 <strong>완전 자동</strong>으로 처리합니다.
+                  별도 Node.js 스크립트로 실행되며 PC에 설치된 Chrome 브라우저를 그대로 사용합니다.
+                </p>
+                <div class="flex gap-2">
+                  <button id="btn-download-playwright-data" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-sm py-2.5 rounded-lg transition-colors font-medium">
+                    <i class="fas fa-download mr-1"></i> 자동화 데이터 다운로드 (JSON)
+                  </button>
+                  <button id="btn-copy-playwright-cmd" class="px-4 bg-white hover:bg-purple-100 text-purple-700 text-sm py-2.5 rounded-lg transition-colors border border-purple-300">
+                    <i class="fas fa-terminal mr-1"></i> 실행 명령어
+                  </button>
+                </div>
+                <div id="playwright-cmd-box" class="hidden mt-3 bg-gray-900 rounded-lg p-3 font-mono text-green-400 text-xs overflow-x-auto">
+                  <p class="text-gray-500 mb-1"># 1. 의존성 설치 (최초 1회)</p>
+                  <p>cd kb-automation && npm install && npx playwright install chromium</p>
+                  <p class="text-gray-500 mt-2 mb-1"># 2. 환경변수 설정 (.env 파일 생성)</p>
+                  <p>echo KB_ID=r4585414 {'>'} .env</p>
+                  <p>echo KB_PW=zxcv100* {'>>'} .env</p>
+                  <p>echo KB_BIRTH=950924 {'>>'} .env</p>
+                  <p class="text-gray-500 mt-2 mb-1"># 3. 다운로드한 JSON 파일을 kb-automation 폴더에 놓기</p>
+                  <p>mv ~/Downloads/kb-data.json ./kb-automation/</p>
+                  <p class="text-gray-500 mt-2 mb-1"># 4. 실행</p>
+                  <p>cd kb-automation && node kb-automation.js</p>
+                </div>
+                <p class="text-xs text-purple-500 mt-2" id="playwright-status">
+                  <i class="fas fa-info-circle mr-1"></i> JSON 다운로드 후 위 명령어를 터미널에서 실행하세요. 
+                  <a href="/static/PLAYWRIGHT_GUIDE.md" target="_blank" class="underline font-medium">상세 가이드 보기</a>
+                </p>
               </div>
             </div>
           </div>

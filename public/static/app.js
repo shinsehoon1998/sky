@@ -542,6 +542,66 @@ document.getElementById('btn-batch-next').addEventListener('click', () => {
 });
 
 // ============================================================
+// Playwright 자동화 데이터 다운로드
+// ============================================================
+document.getElementById('btn-download-playwright-data').addEventListener('click', async () => {
+  const selected = state.validatedData
+    .filter(r => r.isValid && state.selectedIndices.has(r.index))
+    .map(r => state.rawData[r.index]);
+
+  if (selected.length === 0) {
+    showToast('error', '선택된 고객이 없습니다');
+    return;
+  }
+
+  try {
+    const resp = await fetch('/api/export-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: selected })
+    });
+    const json = await resp.json();
+
+    // JSON 파일 다운로드
+    const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kb-data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    document.getElementById('playwright-status').innerHTML =
+      `<i class="fas fa-check-circle mr-1 text-green-600"></i> <span class="text-green-700">다운로드 완료!</span> ` +
+      `<span class="text-gray-500">파일을 </span><code class="bg-gray-200 px-1 rounded">kb-automation/</code><span class="text-gray-500"> 폴더로 이동 후 실행하세요.</span>`;
+
+    showToast('success', `${json.total}명 데이터 다운로드 완료 (${json.batches}개 배치)`);
+  } catch (err) {
+    showToast('error', '데이터 다운로드 실패: ' + err.message);
+  }
+});
+
+// 실행 명령어 복사
+document.getElementById('btn-copy-playwright-cmd').addEventListener('click', () => {
+  const box = document.getElementById('playwright-cmd-box');
+  box.classList.toggle('hidden');
+
+  if (!box.classList.contains('hidden')) {
+    const cmds = [
+      'cd kb-automation && npm install && npx playwright install chromium',
+      'echo KB_ID=r4585414 > .env && echo KB_PW=zxcv100* >> .env && echo KB_BIRTH=950924 >> .env',
+      'mv ~/Downloads/kb-data.json ./kb-automation/',
+      'cd kb-automation && node kb-automation.js'
+    ].join('\n');
+    navigator.clipboard.writeText(cmds).then(() => {
+      showToast('info', '실행 명령어가 클립보드에 복사되었습니다');
+    }).catch(() => {});
+  }
+});
+
+// ============================================================
 // Step 4: 동의서 출력
 // ============================================================
 function initConsent() {
