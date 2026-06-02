@@ -1,1 +1,135 @@
-h1 { font-family: Arial, Helvetica, sans-serif; }
+/* 고객정보 등록 및 동의서 출력 시스템 - 스타일 */
+
+/* 인쇄 스타일 */
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+    background: white !important;
+  }
+
+  header, nav, footer, .print\\:hidden,
+  #step-indicator,
+  #section-upload,
+  #section-preview,
+  #section-macro,
+  #section-consent button,
+  #section-consent .flex.justify-between,
+  #consent-preview-area > div:not(#consent-content),
+  #progress-bar-container,
+  #modal-overlay,
+  #toast {
+    display: none !important;
+  }
+
+  #consent-doc {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  #section-consent {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
+
+/* 드롭존 애니메이션 */
+#drop-zone {
+  transition: all 0.3s ease;
+}
+
+/* 테이블 행 호버 */
+#table-body tr:hover {
+  cursor: pointer;
+}
+
+/* 체크박스 커스텀 */
+input[type="checkbox"].rounded {
+  accent-color: #2563eb;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* 프로그레스 바 */
+#progress-bar {
+  transition: width 0.5s ease;
+}
+
+/* 토스트 애니메이션 */
+#toast {
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 동의서 문서 스타일 */
+#consent-doc {
+  background: white;
+}
+
+#consent-doc h1 {
+  letter-spacing: 0.15em;
+}
+
+/* 모달 */
+#modal-overlay {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  #step-indicator .flex.items-center.gap-2 {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .grid.grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .grid.grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 스크롤바 커스텀 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
