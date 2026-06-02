@@ -366,89 +366,358 @@ document.getElementById('btn-select-all').addEventListener('click', function() {
 });
 
 // ============================================================
-// Step 3: 전산등록 매크로
+// Step 3: 전산등록 매크로 (팝업 창 자동화)
 // ============================================================
+const KB_LOGIN_URL = 'https://nsales.kbinsure.co.kr/eus/ch/ch_index.jsp';
 let macroQueue = [];
+let macroWindow = null;        // KB손보 팝업창 참조
+let macroInjected = false;     // 주입 스크립트 삽입 여부
 
+/** 매크로 초기화 - 팝업창 열기 */
 function initMacro() {
   macroQueue = state.validatedData
     .filter(r => r.isValid && state.selectedIndices.has(r.index))
     .map(r => state.rawData[r.index]);
 
+  if (macroQueue.length === 0) {
+    showToast('error', '선택된 고객이 없습니다');
+    return;
+  }
+
   state.currentMacroIdx = 0;
   document.getElementById('section-macro').classList.remove('hidden');
-
-  if (macroQueue.length > 0) {
-    document.getElementById('current-customer').classList.remove('hidden');
-    showMacroCustomer(0);
-  }
   navigateToStep(3);
+
+  // KB손보 사이트를 새 창으로 열기
+  openKBPopup();
 }
 
-function showMacroCustomer(idx) {
-  if (idx < 0 || idx >= macroQueue.length) return;
-  state.currentMacroIdx = idx;
-  const cust = macroQueue[idx];
+/** KB손보 사이트 팝업 열기 */
+function openKBPopup() {
+  if (macroWindow && !macroWindow.closed) {
+    macroWindow.focus();
+    updateConnectionUI('connected', '이미 열려 있음');
+    return;
+  }
 
-  document.getElementById('macro-name').textContent = cust.name;
-  document.getElementById('macro-jumin').textContent = `${cust.jumin.substring(0, 6)}-${'*'.repeat(7)}`;
-  document.getElementById('macro-phone').textContent = cust.phone;
-  document.getElementById('macro-progress').textContent = `${idx + 1} / ${macroQueue.length}`;
+  const width = 1280;
+  const height = 900;
+  const left = (screen.width - width) / 2;
+  const top = (screen.height - height) / 2;
 
-  // 자동 클립보드 복사
-  const copyText = `${cust.name}\t${cust.jumin}\t${cust.phone}`;
-  navigator.clipboard.writeText(copyText).then(() => {
-    document.getElementById('clipboard-status').innerHTML = `
-      <p class="text-xs text-green-600 font-medium"><i class="fas fa-check-circle mr-1"></i> 클립보드 복사 완료</p>
-      <p class="text-xs text-gray-400 mt-1">이름 / 주민번호 / 연락처가 복사되었습니다. 전산 시스템에 붙여넣기 하세요.</p>
-    `;
-    document.getElementById('btn-copy-next').innerHTML = '<i class="fas fa-arrow-right mr-1"></i> 다음 고객 복사';
-  }).catch(() => {
-    document.getElementById('clipboard-status').innerHTML = `
-      <p class="text-xs text-red-600 font-medium">클립보드 복사 실패</p>
-      <p class="text-xs text-gray-400 mt-1">수동으로 복사해 주세요</p>
-    `;
+  macroWindow = window.open(
+    KB_LOGIN_URL,
+    'KBPopup',
+    `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=yes,scrollbars=yes`
+  );
+
+  if (!macroWindow) {
+    showToast('error', '팝업이 차단되었습니다. 팝업 차단을 해제해 주세요.');
+    updateConnectionUI('blocked', '팝업 차단됨');
+    return;
+  }
+
+  updateConnectionUI('opened', '팝업 열림 (로그인 진행 중...)');
+  document.getElementById('btn-open-popup').classList.add('hidden');
+  document.getElementById('btn-reopen-popup').classList.remove('hidden');
+  document.getElementById('btn-check-fields').classList.remove('hidden');
+  document.getElementById('current-customer').classList.remove('hidden');
+
+  // 팝업이 완전히 로드된 후 주입 스크립트 삽입 시도
+  macroWindow.addEventListener('load', () => {
+    updateConnectionUI('loading', 'KB손보 페이지 로드 완료, 스크립트 주입 대기...');
+    setTimeout(() => injectMacroScript(), 2000);
   });
+
+  // 이미 로드된 상태면 바로 주입
+  setTimeout(() => {
+    if (macroWindow && macroWindow.document && macroWindow.document.readyState === 'complete') {
+      injectMacroScript();
+    }
+  }, 3000);
 
   updateProgressBar();
 }
 
-document.getElementById('btn-copy-next').addEventListener('click', () => {
+/** 연결 상태 UI 업데이트 */
+function updateConnectionUI(status, message) {
+  const badge = document.getElementById('macro-connection-badge');
+  const popupStatus = document.getElementById('macro-popup-status');
+  const injectStatus = document.getElementById('macro-inject-status');
+
+  const statusConfig = {
+    disconnected: { badgeClass: 'bg-gray-100 text-gray-500', badgeText: '연결 안 됨', popupIcon: 'fa-circle text-gray-400' },
+    opened:       { badgeClass: 'bg-yellow-100 text-yellow-700', badgeText: '연결 중', popupIcon: 'fa-circle text-yellow-500' },
+    loading:      { badgeClass: 'bg-yellow-100 text-yellow-700', badgeText: '로딩 중', popupIcon: 'fa-circle text-yellow-500' },
+    connected:    { badgeClass: 'bg-green-100 text-green-700', badgeText: '연결됨', popupIcon: 'fa-circle text-green-500' },
+    injected:     { badgeClass: 'bg-green-100 text-green-700', badgeText: '자동화 활성', popupIcon: 'fa-circle text-green-500' },
+    fallback:     { badgeClass: 'bg-blue-100 text-blue-700', badgeText: '클립보드 모드', popupIcon: 'fa-circle text-blue-500' },
+    blocked:      { badgeClass: 'bg-red-100 text-red-700', badgeText: '차단됨', popupIcon: 'fa-circle text-red-500' },
+  };
+
+  const cfg = statusConfig[status] || statusConfig.disconnected;
+  badge.className = `px-2 py-0.5 text-xs rounded-full ${cfg.badgeClass}`;
+  badge.textContent = cfg.badgeText;
+  popupStatus.innerHTML = `<i class="fas ${cfg.popupIcon} text-xs mr-1"></i> ${message}`;
+}
+
+/** KB손보 팝업에 자동화 스크립트 주입 */
+function injectMacroScript() {
+  if (!macroWindow || macroWindow.closed) return;
+  if (macroInjected) return;
+
+  try {
+    const doc = macroWindow.document;
+
+    // 이미 주입된 스크립트가 있는지 확인
+    if (doc.getElementById('kb-macro-helper')) {
+      macroInjected = true;
+      updateConnectionUI('injected', '스크립트 이미 주입됨');
+      return;
+    }
+
+    // 주입할 스크립트 생성
+    const script = doc.createElement('script');
+    script.id = 'kb-macro-helper';
+    script.textContent = `
+      // KB손보 매크로 헬퍼 - 부모창(opener)과 통신
+      window.__kbMacroReady = true;
+
+      // 부모창에서 데이터를 받아 입력하는 함수
+      window.kbFillForm = function(data) {
+        // 주민등록번호 입력 필드 찾기 (다양한 name/id 패턴 대응)
+        const juminInput =
+          doc.querySelector('input[name*="rrn"]') ||
+          doc.querySelector('input[id*="rrn"]') ||
+          doc.querySelector('input[name*="jumin"]') ||
+          doc.querySelector('input[id*="jumin"]') ||
+          doc.querySelector('input[placeholder*="주민"]');
+        if (juminInput) juminInput.value = data.jumin;
+
+        // 이름 입력 필드
+        const nameInput =
+          doc.querySelector('input[name*="name"]') ||
+          doc.querySelector('input[id*="name"]') ||
+          doc.querySelector('input[placeholder*="이름"]') ||
+          doc.querySelector('input[placeholder*="성명"]');
+        if (nameInput) nameInput.value = data.name;
+
+        // 연락처 입력 필드
+        const phoneInput =
+          doc.querySelector('input[name*="phone"]') ||
+          doc.querySelector('input[id*="phone"]') ||
+          doc.querySelector('input[name*="tel"]') ||
+          doc.querySelector('input[id*="tel"]') ||
+          doc.querySelector('input[placeholder*="연락처"]');
+        if (phoneInput) phoneInput.value = data.phone;
+
+        return { success: true, filled: { jumin: !!juminInput, name: !!nameInput, phone: !!phoneInput } };
+      };
+
+      // 현재 페이지의 모든 입력 필드 정보 반환
+      window.kbGetFields = function() {
+        const inputs = doc.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
+        const fields = [];
+        inputs.forEach(inp => {
+          fields.push({
+            tag: inp.tagName,
+            type: inp.type || 'text',
+            id: inp.id || '',
+            name: inp.name || '',
+            placeholder: inp.placeholder || '',
+            className: inp.className || ''
+          });
+        });
+        return fields;
+      };
+
+      // 동의서 출력 버튼 찾아서 클릭
+      window.kbClickConsent = function() {
+        const btns = doc.querySelectorAll('a, button, input[type="button"], input[type="submit"]');
+        for (const btn of btns) {
+          const text = (btn.textContent || btn.value || '').trim();
+          if (text.includes('동의서') || text.includes('출력') || text.includes('인쇄')) {
+            btn.click();
+            return { success: true, clicked: text };
+          }
+        }
+        return { success: false, message: '동의서 출력 버튼을 찾을 수 없습니다' };
+      };
+
+      console.log('[KB매크로] 헬퍼 스크립트 주입 완료');
+      console.log('[KB매크로] 발견된 입력 필드:', window.kbGetFields());
+    `;
+    doc.head.appendChild(script);
+    macroInjected = true;
+    updateConnectionUI('injected', '스크립트 주입 완료 (자동 입력 가능)');
+    document.getElementById('macro-inject-status').innerHTML = '<i class="fas fa-circle text-green-500 text-xs mr-1"></i> 자동 입력 활성화';
+
+    // 현재 고객 데이터 보내기
+    setTimeout(() => sendToKB(0), 1000);
+  } catch (err) {
+    console.error('스크립트 주입 실패:', err);
+    // CORS로 인해 주입이 안 되면 클립보드 방식으로 안내
+    updateConnectionUI('fallback', '스크립트 주입 실패 (클립보드 모드)');
+    document.getElementById('macro-inject-status').innerHTML = '<i class="fas fa-circle text-blue-500 text-xs mr-1"></i> 클립보드 모드';
+    document.getElementById('clipboard-status').innerHTML = '<p class="text-xs text-blue-600"><i class="fas fa-info-circle mr-1"></i> 자동 입력이 불가능하여 클립보드 복사 방식으로 전환됩니다.</p>';
+  }
+}
+
+/** 현재 고객 데이터를 KB 팝업으로 전송 */
+function sendToKB(idx) {
+  if (!macroWindow || macroWindow.closed) {
+    showToast('error', 'KB손보 창이 닫혔습니다. 다시 열어주세요.');
+    return;
+  }
+  if (idx < 0 || idx >= macroQueue.length) return;
+
+  state.currentMacroIdx = idx;
+  const cust = macroQueue[idx];
+  const juminDigits = cust.jumin.replace(/[^0-9]/g, '');
+  const data = {
+    jumin: juminDigits.length === 13 ? `${juminDigits.substring(0, 6)}-${juminDigits.substring(6)}` : cust.jumin,
+    name: cust.name,
+    phone: cust.phone
+  };
+
+  // UI 업데이트
+  document.getElementById('macro-name').textContent = cust.name;
+  document.getElementById('macro-jumin').textContent = `${juminDigits.substring(0, 6)}-${'*'.repeat(7)}`;
+  document.getElementById('macro-phone').textContent = cust.phone;
+  document.getElementById('macro-progress').textContent = `${idx + 1} / ${macroQueue.length}`;
+  document.getElementById('macro-progress-pct').textContent = `${Math.round((idx + 1) / macroQueue.length * 100)}%`;
+  document.getElementById('macro-progress-bar').style.width = `${Math.round((idx + 1) / macroQueue.length * 100)}%`;
+  document.getElementById('current-customer').classList.remove('hidden');
+  document.getElementById('btn-macro-next').innerHTML = '다음 <i class="fas fa-chevron-right ml-1"></i>';
+
+  try {
+    if (macroWindow.__kbMacroReady && typeof macroWindow.kbFillForm === 'function') {
+      const result = macroWindow.kbFillForm(data);
+      if (result.success) {
+        const status = document.getElementById('clipboard-status');
+        status.innerHTML = `
+          <p class="text-xs text-green-600 font-medium"><i class="fas fa-check-circle mr-1"></i> 데이터 입력 완료</p>
+          <p class="text-xs text-gray-400 mt-1">주민번호: ${result.filled.jumin ? '✓' : '✗'} | 이름: ${result.filled.name ? '✓' : '✗'} | 연락처: ${result.filled.phone ? '✓' : '✗'}</p>
+          <p class="text-xs text-gray-400 mt-1">동의서 출력 버튼을 클릭해 주세요 → <button onclick="macroWindow.kbClickConsent()" class="text-blue-500 underline">동의서 출력 클릭</button></p>
+        `;
+      } else {
+        fallbackClipboard(data);
+      }
+    } else {
+      fallbackClipboard(data);
+    }
+  } catch (err) {
+    console.error('KB 데이터 전송 오류:', err);
+    fallbackClipboard(data);
+  }
+
+  updateProgressBar();
+}
+
+/** 주입 실패 시 클립보드 방식으로 폴백 */
+function fallbackClipboard(data) {
+  const copyText = `${data.name}\t${data.jumin}\t${data.phone}`;
+  navigator.clipboard.writeText(copyText).then(() => {
+    document.getElementById('clipboard-status').innerHTML = `
+      <p class="text-xs text-blue-600 font-medium"><i class="fas fa-info-circle mr-1"></i> 클립보드에 복사됨 (수동 붙여넣기)</p>
+      <p class="text-xs text-gray-400 mt-1">이름 / 주민번호 / 연락처가 복사되었습니다. KB손보 사이트에 직접 붙여넣기 하세요.</p>
+    `;
+  }).catch(() => {
+    document.getElementById('clipboard-status').innerHTML = `
+      <p class="text-xs text-red-600 font-medium">클립보드 복사 실패</p>
+      <p class="text-xs text-gray-400 mt-1">수동으로 입력해 주세요: ${data.name} / ${data.jumin} / ${data.phone}</p>
+    `;
+  });
+  document.getElementById('current-customer').classList.remove('hidden');
+  document.getElementById('macro-name').textContent = data.name;
+  document.getElementById('macro-jumin').textContent = data.jumin;
+  document.getElementById('macro-phone').textContent = data.phone;
+}
+
+/** 팝업 다시 열기 */
+function reopenKBPopup() {
+  macroInjected = false;
+  openKBPopup();
+}
+
+// ============================================================
+// 버튼 이벤트 핸들러
+// ============================================================
+
+/** 팝업 열기 */
+document.getElementById('btn-open-popup').addEventListener('click', () => {
+  macroQueue = state.validatedData
+    .filter(r => r.isValid && state.selectedIndices.has(r.index))
+    .map(r => state.rawData[r.index]);
+
+  if (macroQueue.length === 0) {
+    showToast('error', '선택된 고객이 없습니다');
+    return;
+  }
+
+  state.currentMacroIdx = 0;
+  document.getElementById('section-macro').classList.remove('hidden');
+  document.getElementById('current-customer').classList.add('hidden');
+  navigateToStep(3);
+  openKBPopup();
+});
+
+/** 팝업 다시 열기 */
+document.getElementById('btn-reopen-popup').addEventListener('click', () => {
+  macroInjected = false;
+  if (macroWindow && !macroWindow.closed) macroWindow.close();
+  macroWindow = null;
+  openKBPopup();
+});
+
+/** 입력 필드 확인 */
+document.getElementById('btn-check-fields').addEventListener('click', () => {
+  if (!macroWindow || macroWindow.closed) {
+    showToast('error', 'KB손보 팝업이 열려있지 않습니다');
+    return;
+  }
+  try {
+    const fields = macroWindow.kbGetFields();
+    if (fields && fields.length > 0) {
+      const fieldNames = fields.map(f => f.name || f.id || f.placeholder || '(이름 없음)').join(', ');
+      showToast('info', `발견된 입력 필드 (${fields.length}개): ${fieldNames}`);
+    } else {
+      showToast('warning', '입력 필드를 찾을 수 없습니다. 동의서 출력 페이지로 이동했는지 확인하세요.');
+    }
+  } catch (err) {
+    showToast('error', '필드 정보를 가져올 수 없습니다. 스크립트가 주입되지 않았습니다.');
+  }
+});
+
+/** 다음 고객 데이터 전송 (btn-macro-next) */
+document.getElementById('btn-macro-next').addEventListener('click', () => {
   if (macroQueue.length === 0) return;
   if (state.currentMacroIdx < macroQueue.length - 1) {
-    showMacroCustomer(state.currentMacroIdx + 1);
+    sendToKB(state.currentMacroIdx + 1);
   } else {
-    showToast('success', '모든 고객 처리가 완료되었습니다');
-    document.getElementById('btn-copy-next').innerHTML = '<i class="fas fa-check mr-1"></i> 완료';
+    showToast('success', '모든 고객 처리가 완료되었습니다. Step 4에서 동의서를 출력하세요.');
+    document.getElementById('btn-macro-next').innerHTML = '<i class="fas fa-check mr-1"></i> 완료';
     updateProgressBar(true);
   }
 });
 
+/** 이전 고객 데이터 전송 (btn-macro-prev) */
+document.getElementById('btn-macro-prev').addEventListener('click', () => {
+  if (state.currentMacroIdx > 0) sendToKB(state.currentMacroIdx - 1);
+});
+
+/** 전체 클립보드 복사 (btn-copy-all) */
 document.getElementById('btn-copy-all').addEventListener('click', () => {
   if (macroQueue.length === 0) return;
-  const allText = macroQueue.map(c => `${c.name}\t${c.jumin}\t${c.phone}`).join('\n');
+  const allText = macroQueue.map(c => {
+    const jd = c.jumin.replace(/[^0-9]/g, '');
+    return `${c.name}\t${jd.length === 13 ? jd.substring(0, 6) + '-' + jd.substring(6) : c.jumin}\t${c.phone}`;
+  }).join('\n');
   navigator.clipboard.writeText(allText).then(() => {
     showToast('success', `전체 ${macroQueue.length}건이 클립보드에 복사되었습니다`);
   }).catch(() => {
     showToast('error', '전체 복사에 실패했습니다');
   });
-});
-
-document.getElementById('btn-macro-prev').addEventListener('click', () => {
-  if (state.currentMacroIdx > 0) showMacroCustomer(state.currentMacroIdx - 1);
-});
-
-document.getElementById('btn-macro-next').addEventListener('click', () => {
-  if (state.currentMacroIdx < macroQueue.length - 1) showMacroCustomer(state.currentMacroIdx + 1);
-  else showToast('success', '마지막 고객입니다');
-});
-
-// 자동 다음 단계 버튼
-document.getElementById('btn-copy-next').addEventListener('dblclick', () => {
-  // 더블클릭 시 4단계로 이동
-  if (state.currentMacroIdx >= macroQueue.length - 1) {
-    initConsent();
-  }
 });
 
 // ============================================================
@@ -750,6 +1019,12 @@ function updateProgressBar(complete = false) {
 
   bar.style.width = `${pct}%`;
   text.textContent = complete ? `${total}/${total} (완료)` : `${current}/${total}`;
+
+  // Step 3 매크로 섹션 내부 진행률 표시줄도 동시에 업데이트
+  const macroBar = document.getElementById('macro-progress-bar');
+  const macroPct = document.getElementById('macro-progress-pct');
+  if (macroBar) macroBar.style.width = `${pct}%`;
+  if (macroPct) macroPct.textContent = `${pct}%`;
 }
 
 // ============================================================

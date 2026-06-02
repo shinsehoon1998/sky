@@ -288,69 +288,85 @@ function MainPage() {
           </div>
         </section>
 
-        {/* Step 3: 전산등록 매크로 */}
+        {/* Step 3: 전산등록 매크로 (팝업 윈도우 자동화) */}
         <section id="section-macro" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 hidden">
           <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <i class="fas fa-robot text-blue-500"></i>
             3. 전산 등록 매크로
           </h2>
-          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+
+          {/* 안내 배너 */}
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
             <div class="flex items-start gap-3">
-              <i class="fas fa-exclamation-triangle text-yellow-600 mt-1"></i>
+              <i class="fas fa-info-circle text-blue-600 mt-1"></i>
               <div>
-                <p class="font-medium text-yellow-800 text-sm">보험사 전산 시스템 연동 안내</p>
-                <p class="text-yellow-700 text-sm mt-1">Cloudflare Workers 환경에서는 서버 측 브라우저 자동화가 불가능합니다. 아래 하이브리드 방식을 이용해 주세요.</p>
+                <p class="font-medium text-blue-800 text-sm">팝업 윈도우 자동화 방식</p>
+                <p class="text-blue-700 text-sm mt-1">
+                  KB손해보험 전산 시스템을 <strong>새 창(팝업)</strong>으로 열고, 고객 데이터를 자동 입력합니다.
+                  주입이 불가능할 경우 클립보드 복사 방식으로 자동 전환됩니다.
+                </p>
               </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            {/* 방법 1: 클립보드 복사 */}
-            <div class="border border-gray-200 rounded-lg p-4">
-              <div class="flex items-center gap-2 mb-3">
-                <div class="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span class="text-blue-600 font-bold text-sm">1</span>
-                </div>
-                <h3 class="font-bold text-gray-700 text-sm">클립보드 복사 방식</h3>
+          {/* KB 팝업 연결 상태 */}
+          <div class="border border-gray-200 rounded-lg p-4 mb-4">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-bold text-gray-700 text-sm flex items-center gap-2">
+                <i class="fas fa-external-link-alt text-gray-500"></i>
+                KB손해보험 전산 시스템 연결
+              </h3>
+              <span id="macro-connection-badge" class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">
+                연결 안 됨
+              </span>
+            </div>
+
+            {/* 연결 상태 상세 */}
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div class="bg-gray-50 rounded-lg p-3">
+                <p class="text-xs text-gray-400 mb-1">팝업 상태</p>
+                <p class="text-sm font-medium text-gray-700" id="macro-popup-status">
+                  <i class="fas fa-circle text-gray-400 text-xs mr-1"></i> 열리지 않음
+                </p>
               </div>
-              <p class="text-xs text-gray-500 mb-3">선택한 고객 데이터를 클립보드에 순차 복사하여 전산 시스템에 붙여넣기</p>
-              <div class="bg-gray-50 rounded p-3 mb-3" id="clipboard-status">
-                <p class="text-xs text-gray-500">대기 중...</p>
-              </div>
-              <div class="flex gap-2">
-                <button id="btn-copy-next" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 rounded-lg transition-colors font-medium">
-                  <i class="fas fa-copy mr-1"></i> 다음 고객 복사
-                </button>
-                <button id="btn-copy-all" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2 rounded-lg transition-colors">
-                  전체 복사
-                </button>
+              <div class="bg-gray-50 rounded-lg p-3">
+                <p class="text-xs text-gray-400 mb-1">자동 입력</p>
+                <p class="text-sm font-medium text-gray-700" id="macro-inject-status">
+                  <i class="fas fa-circle text-gray-400 text-xs mr-1"></i> 대기 중
+                </p>
               </div>
             </div>
 
-            {/* 방법 2: iframe 직접 입력 */}
-            <div class="border border-gray-200 rounded-lg p-4">
-              <div class="flex items-center gap-2 mb-3">
-                <div class="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center">
-                  <span class="text-green-600 font-bold text-sm">2</span>
-                </div>
-                <h3 class="font-bold text-gray-700 text-sm">실시간 입력 방식</h3>
-              </div>
-              <p class="text-xs text-gray-500 mb-3">전산 시스템 URL을 입력하고 브라우저 내에서 직접 입력 제어</p>
-              <div class="flex gap-2 mb-3">
-                <input type="text" id="target-url" placeholder="전산 시스템 URL 입력" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                <button id="btn-open-frame" class="px-4 bg-green-600 hover:bg-green-700 text-white text-sm py-2 rounded-lg transition-colors font-medium">
-                  연결
-                </button>
-              </div>
-              <div class="bg-gray-50 rounded p-3">
-                <p class="text-xs text-gray-500">※ iframe을 통한 접속은 대상 사이트의 X-Frame-Options 정책에 따라 차단될 수 있습니다. 차단 시 클립보드 방식을 이용해 주세요.</p>
-              </div>
+            <div class="flex gap-2">
+              <button id="btn-open-popup" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 rounded-lg transition-colors font-medium">
+                <i class="fas fa-window-restore mr-1"></i> KB손보 팝업 열기
+              </button>
+              <button id="btn-reopen-popup" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2 rounded-lg transition-colors hidden">
+                <i class="fas fa-redo mr-1"></i> 다시 열기
+              </button>
+              <button id="btn-check-fields" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2 rounded-lg transition-colors hidden">
+                <i class="fas fa-search mr-1"></i> 필드 확인
+              </button>
+            </div>
+          </div>
+
+          {/* 데이터 전송 상태 */}
+          <div class="border border-gray-200 rounded-lg p-4 mb-4" id="clipboard-status-panel">
+            <div class="flex items-center gap-2 mb-3">
+              <i class="fas fa-paper-plane text-gray-400"></i>
+              <h3 class="font-bold text-gray-700 text-sm">데이터 전송 상태</h3>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3" id="clipboard-status">
+              <p class="text-xs text-gray-500"><i class="fas fa-clock mr-1"></i> KB손보 팝업을 열고 로그인 후 진행하세요.</p>
             </div>
           </div>
 
           {/* 현재 처리 중인 고객 정보 */}
           <div id="current-customer" class="border border-gray-200 rounded-lg p-4 hidden">
-            <h3 class="font-bold text-gray-700 text-sm mb-3">현재 처리 중</h3>
+            <h3 class="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2">
+              <i class="fas fa-user-check text-green-500"></i>
+              현재 처리 중
+            </h3>
             <div class="grid grid-cols-3 gap-4">
               <div>
                 <p class="text-xs text-gray-400 mb-1">이름</p>
@@ -365,14 +381,44 @@ function MainPage() {
                 <p class="font-bold text-gray-800 text-lg" id="macro-phone">-</p>
               </div>
             </div>
-            <div class="flex gap-2 mt-3">
+
+            {/* 진행률 표시줄 */}
+            <div class="mt-3 mb-3">
+              <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span id="macro-progress"></span>
+                <span id="macro-progress-pct">0%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="macro-progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
               <button id="btn-macro-prev" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">
                 <i class="fas fa-chevron-left mr-1"></i> 이전
               </button>
               <button id="btn-macro-next" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors font-medium">
                 다음 <i class="fas fa-chevron-right ml-1"></i>
               </button>
-              <span class="text-sm text-gray-500 self-center ml-2" id="macro-progress"></span>
+              <button id="btn-copy-all" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg transition-colors">
+                <i class="fas fa-copy mr-1"></i> 전체 복사
+              </button>
+            </div>
+          </div>
+
+          {/* 주의사항 */}
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+            <div class="flex items-start gap-2">
+              <i class="fas fa-exclamation-triangle text-yellow-600 text-xs mt-0.5"></i>
+              <div class="text-xs text-yellow-700">
+                <p class="font-medium">사용 전 확인사항</p>
+                <ul class="list-disc list-inside mt-1 space-y-0.5 text-yellow-600">
+                  <li>MiAgent (KB손보 보안 프로그램)가 PC에 설치되어 있어야 합니다.</li>
+                  <li>팝업 차단이 해제되어 있어야 합니다. (브라우저 설정에서 확인)</li>
+                  <li>팝업 창에서 KB손보 시스템에 먼저 로그인해 주세요.</li>
+                  <li>크로스 오리진 제한으로 스크립트 주입이 안 될 경우, 클립보드 방식으로 자동 전환됩니다.</li>
+                </ul>
+              </div>
             </div>
           </div>
         </section>
