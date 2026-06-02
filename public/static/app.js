@@ -92,29 +92,81 @@ function processFile(file) {
   reader.onload = function(e) {
     try {
       const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
+      const workbook = XLSX.read(data, { type: 'array', cellText: true, cellDates: false });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+      // 셀 데이터를 안전하게 문자열로 변환하는 함수
+      function safeCellValue(cell) {
+        if (!cell) return '';
+        // cell.w: formatted text (엑셀에 표시되는 그대로의 값) - 가장 우선
+        if (cell.w !== undefined && cell.w !== null && String(cell.w).trim() !== '') {
+          return String(cell.w).trim();
+        }
+        // cell.v: raw value
+        if (cell.v !== undefined && cell.v !== null) {
+          const val = cell.v;
+          // 숫자 타입이고 지수 표기법으로 표시될 가능성이 있는 경우
+          if (typeof val === 'number') {
+            // 정수인 경우 소수점 없이 전체 자릿수 출력
+            if (Number.isInteger(val) && val < 1e15) {
+              return String(Math.floor(val));
+            }
+            // 큰 정수 (주민번호 등): toFixed로 정확한 자릿수 확보
+            if (val > 1000000000000) {
+              return String(Math.floor(val));
+            }
+            return String(val);
+          }
+          return String(val).trim();
+        }
+        // cell.r 또는 t 참조
+        if (cell.t === 's') return ''; // shared string이면 빈 값
+        return '';
+      }
+
+      // ref 기반으로 모든 셀 순회
+      const ref = firstSheet['!ref'];
+      if (!ref) {
+        showToast('error', '엑셀 파일에 데이터가 없습니다');
+        return;
+      }
+
+      const range = XLSX.utils.decode_range(ref);
+      const rows = [];
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        const row = [];
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cellAddr = XLSX.utils.encode_cell({ r, c });
+          const cell = firstSheet[cellAddr];
+          row.push(safeCellValue(cell));
+        }
+        rows.push(row);
+      }
 
       if (rows.length < 2) {
         showToast('error', '데이터가 없거나 형식이 올바르지 않습니다');
         return;
       }
 
-      // 헤더 행 감지 (주민등록번호, 이름, 전화번호)
-      const headerRow = rows[0];
-      const juminIdx = 0; // A열
-      const nameIdx = 1;  // B열
-      const phoneIdx = 2; // C열
+      // A열(주민등록번호), B열(이름), C열(전화번호)
+      const juminIdx = 0;
+      const nameIdx = 1;
+      const phoneIdx = 2;
 
       state.rawData = [];
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || (!row[juminIdx] && !row[nameIdx] && !row[phoneIdx])) continue;
-        const jumin = String(row[juminIdx] || '').trim();
-        const name = String(row[nameIdx] || '').trim();
-        const phone = String(row[phoneIdx] || '').trim();
+        if (!row || row.length === 0) continue;
+        const jumin = (row[juminIdx] || '').trim();
+        const name = (row[nameIdx] || '').trim();
+        const phone = (row[phoneIdx] || '').trim();
         if (!jumin && !name && !phone) continue;
+
+        // 전화번호에서 하이픈(-)이 소수점으로 변환된 경우 보정
+        // 예: - 가 엑셀 내부에서 처리되면서 소수점으로 해석될 수 있음
+        // phone이 순수 숫자로 변환된 경우 010-XXXX-XXXX → 10-XXXX-XXXX 형태
+        // 그대로 사용 (어차피 검증 단계에서 표준화)
+
         state.rawData.push({ jumin, name, phone });
       }
 

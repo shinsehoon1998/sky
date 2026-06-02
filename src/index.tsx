@@ -19,21 +19,25 @@ app.post('/api/validate', async (c) => {
   const results = data.map((record, index) => {
     const errors: string[] = []
 
-    // 주민등록번호 검증
+    // 주민등록번호 검증 (하이픈(-) 허용, 450117-1344117 형식)
     if (!record.jumin || record.jumin.trim() === '') {
       errors.push('주민등록번호가 없습니다')
-    } else if (!/^\d{13}$/.test(record.jumin.trim())) {
-      errors.push('주민등록번호는 13자리 숫자여야 합니다')
     } else {
-      const jumin = record.jumin.trim()
-      const yy = parseInt(jumin.substring(0, 2))
-      const mm = parseInt(jumin.substring(2, 4))
-      const dd = parseInt(jumin.substring(4, 6))
-      const genderCode = parseInt(jumin.substring(6, 7))
+      // 하이픈 제거 후 순수 숫자만 추출
+      const juminRaw = record.jumin.trim()
+      const juminDigits = juminRaw.replace(/[^0-9]/g, '')
+      if (juminDigits.length !== 13) {
+        errors.push('주민등록번호는 13자리 숫자여야 합니다 (현재 ' + juminDigits.length + '자리)')
+      } else {
+        const yy = parseInt(juminDigits.substring(0, 2))
+        const mm = parseInt(juminDigits.substring(2, 4))
+        const dd = parseInt(juminDigits.substring(4, 6))
+        const genderCode = parseInt(juminDigits.substring(6, 7))
 
-      if (mm < 1 || mm > 12) errors.push('생년월일 중 월이 유효하지 않습니다')
-      if (dd < 1 || dd > 31) errors.push('생년월일 중 일이 유효하지 않습니다')
-      if (genderCode < 1 || genderCode > 8) errors.push('성별구분 코드가 유효하지 않습니다')
+        if (mm < 1 || mm > 12) errors.push('생년월일 중 월이 유효하지 않습니다')
+        if (dd < 1 || dd > 31) errors.push('생년월일 중 일이 유효하지 않습니다')
+        if (genderCode < 1 || genderCode > 8) errors.push('성별구분 코드가 유효하지 않습니다')
+      }
     }
 
     // 이름 검증
@@ -123,7 +127,8 @@ interface NormalizedRecord {
 // 유틸리티 함수
 // ============================================================
 function normalizeRecord(record: CustomerRecord): NormalizedRecord {
-  const jumin = record.jumin.trim()
+  // 주민등록번호에서 하이픈 등 특수문자 제거 → 순수 13자리 숫자로 정규화
+  const juminDigits = record.jumin.trim().replace(/[^0-9]/g, '')
   const phone = record.phone.trim().replace(/[^0-9]/g, '')
 
   // 전화번호 표준화 (010-XXXX-XXXX)
@@ -137,8 +142,8 @@ function normalizeRecord(record: CustomerRecord): NormalizedRecord {
   }
 
   return {
-    jumin,
-    maskedJumin: `${jumin.substring(0, 6)}-${'*'.repeat(7)}`,
+    jumin: juminDigits,
+    maskedJumin: `${juminDigits.substring(0, 6)}-${'*'.repeat(7)}`,
     name: record.name.trim(),
     phone: formattedPhone
   }
